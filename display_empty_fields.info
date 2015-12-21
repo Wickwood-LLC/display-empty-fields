@@ -1,0 +1,3 @@
+name = Display Empty Fields
+description = Displays empty fields in forms
+core = 7.x
