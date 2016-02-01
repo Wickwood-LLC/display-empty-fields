@@ -5,19 +5,19 @@
  * Show titles of empty fields.
  */
 function display_empty_fields_field_attach_view_alter(&$output, $context) {
-  // We proceed only on nodes.
-  if ($context['entity_type'] != 'profile2' || $context['entity_type'] != 'user' || $context['entity_type'] != 'node') {
+  $allowed_entity_types = array('profile2', 'user', 'node', 'field_collection_item');
+  if (!in_array($context['entity_type'], $allowed_entity_types)) {
     return;
   }
- 
-  $node = $context['entity'];
+
+  list($id, $vid, $bundle) = entity_extract_ids($context['entity_type'], $context['entity']);
   // Load all instances of the fields for the node.
-  $instances = _field_invoke_get_instances('profile2', $node->type, array('default' => TRUE, 'deleted' => FALSE));
- 
+  $instances = _field_invoke_get_instances($context['entity_type'], $bundle, array('default' => TRUE, 'deleted' => FALSE));
+  $language = entity_language($context['entity_type'], $context['entity']);
   foreach ($instances as $field_name => $instance) {
     // Set content for fields they are empty.
-    if (empty($node->{$field_name})) {
-      $display = field_get_display($instance, '*', $node);
+    if (empty($context['entity']->{$field_name})) {
+      $display = field_get_display($instance, '*', $context['entity']);
       // Do not add field that is hidden in current display.
       if ($display['type'] == 'hidden') {
         continue;
@@ -31,13 +31,23 @@ function display_empty_fields_field_attach_view_alter(&$output, $context) {
         '#label_display' => 'above',
         '#field_type' => $field['type'],
         '#field_name' => $field_name,
-        '#bundle' => $node->type,
-        '#object' => $node,
-        '#items' => array(),
-        '#entity_type' => 'node',
+        '#bundle' => $bundle,
+        '#object' => $context['entity'],
+        '#items' => array(0 => array()),
+        '#entity_type' => $context['entity_type'],
         '#weight' => $display['weight'],
+        '#view_mode' => 'full',
+        '#access' => TRUE,
         0 => array('#markup' => '&nbsp;'),
+        '#formatter' => $display['type']
       );
+      if ($field['type'] == 'field_collection') {
+        unset($output[$field_name][0]['#markup']);
+        $fc = entity_create('field_collection_item', array('field_name' => $field_name));
+        $fcv = entity_view('field_collection_item', array($fc), $view_mode = 'full', $language);
+        $output[$field_name][0]['entity'] = $fcv;
+        $output[$field_name]['#formatter'] = 'field_collection_fields';
+      }
     }
   }
 }
